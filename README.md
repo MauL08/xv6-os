@@ -2,3 +2,4 @@
 - Akbar Maulana Alfatih
 - 1313619003
 - Ilmu Komputer 2019
+- Universitas Negeri Jakarta
