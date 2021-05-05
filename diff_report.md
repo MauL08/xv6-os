@@ -195,15 +195,6 @@ diff --git a/proc.c b/proc.c
 index d030537..f351ef8 100644
 --- a/proc.c
 +++ b/proc.c
-@@ -34,7 +34,7 @@ static struct {
- // list management function prototypes
- #ifdef CS333_P3
- static void initProcessLists(void);
--static void initFreeList(void);
-+static void initFreeist(void);
- static void stateListAdd(struct ptrs*, struct proc*);
- static int  stateListRemove(struct ptrs*, struct proc* p);
- static void assertState(struct proc*, enum procstate, const char *, int);
 @@ -149,6 +149,8 @@ allocproc(void)
    memset(p->context, 0, sizeof *p->context);
    p->context->eip = (uint)forkret;
