@@ -17,6 +17,25 @@ index 6483959..0cc95f7 100644
 ```
 
 # Syscall Tracing
+## Makefile
+```diff
+diff --git a/Makefile b/Makefile
+diff --git a/Makefile b/Makefile
+index 6483959..6a982f7 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ # Set flag to correct CS333 project number: 1, 2, ...
+ # 0 == original xv6-pdx distribution functionality
+-CS333_PROJECT ?= 0
+-PRINT_SYSCALLS ?= 0
++CS333_PROJECT ?= 1
++PRINT_SYSCALLS ?= 1
+ CS333_CFLAGS ?= -DPDX_XV6
+ ifeq ($(CS333_CFLAGS), -DPDX_XV6)
+ CS333_UPROGS +=        _halt _uptime
+@@ -13,7 +13,7 @@ endif
+```
 ## syscall.c
 ```diff
 diff --git a/syscall.c b/syscall.c
