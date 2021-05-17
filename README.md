@@ -4,6 +4,6 @@
 - Ilmu Komputer 2019
 - Universitas Negeri Jakarta
 ***
-- Code Modification => [diff_report.md](./diff_report.md)
-- Screenshot Usertests => [usertests](./usertests)
-- Source Code => [source](./source)
+- Code Modification -> [diff_report.md](./diff_report.md)
+- Screenshot Usertests -> [usertests](./usertests)
+- Source Code -> [source](./source)
