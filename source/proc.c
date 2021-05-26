@@ -420,8 +420,8 @@ void scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      swtch(&(c->scheduler), p->context);
       p->cpu_ticks_in = ticks;
+      swtch(&(c->scheduler), p->context);
       switchkvm();
       // Process is done running for now.
       // It should have changed its p->state before coming back.
@@ -460,8 +460,8 @@ void sched(void)
   if (readeflags() & FL_IF)
     panic("sched interruptible");
   intena = mycpu()->intena;
-  swtch(&p->context, mycpu()->scheduler);
   p->cpu_ticks_total += ticks - (p->cpu_ticks_in);
+  swtch(&p->context, mycpu()->scheduler);
   mycpu()->intena = intena;
 }
 
@@ -589,40 +589,64 @@ int kill(int pid)
 #if defined(CS333_P2)
 void procdumpP2P3P4(struct proc *p, char *state_string)
 {
-  cprintf("%d\t%s\t\t%d\t%d\t%d\t",
-    p->pid,
-    p->name,
-    p->uid,
-    p->gid,
-    p->pid == 1 ? p->pid : p->parent->pid
-  );
+  if (p->pid == 1)
+  {
+    cprintf("%d\t%s\t\t%d\t%d\t%d\t",
+            p->pid,
+            p->name,
+            p->uid,
+            p->gid,
+            p->pid);
+  }
+  if (p->pid != 1)
+  {
+    cprintf("%d\t%s\t\t%d\t%d\t%d\t",
+            p->pid,
+            p->name,
+            p->uid,
+            p->gid,
+            p->parent->pid);
+  }
 
   // Elapsed
-  if ((ticks - (p->start_ticks)) < 10){
-    cprintf("0.00%d\t",(ticks - (p->start_ticks)) );
-  } else if((ticks - (p->start_ticks)) < 100) {
-    cprintf("0.0%d\t",(ticks - (p->start_ticks)) );
-  } else if((ticks - (p->start_ticks)) < 1000) {
-    cprintf("0.%d\t",(ticks - (p->start_ticks)) );
-  } else{
-    cprintf("%d.%d\t",(ticks - (p->start_ticks))/1000,(ticks - (p->start_ticks))%1000);
+  if ((ticks - (p->start_ticks)) < 10)
+  {
+    cprintf("0.00%d\t", (ticks - (p->start_ticks)));
+  }
+  else if ((ticks - (p->start_ticks)) < 100)
+  {
+    cprintf("0.0%d\t", (ticks - (p->start_ticks)));
+  }
+  else if ((ticks - (p->start_ticks)) < 1000)
+  {
+    cprintf("0.%d\t", (ticks - (p->start_ticks)));
+  }
+  else
+  {
+    cprintf("%d.%d\t", (ticks - (p->start_ticks)) / 1000, (ticks - (p->start_ticks)) % 1000);
   }
 
   // CPU ticks
-  if (p->cpu_ticks_total < 10){
-    cprintf("0.00%d", p->cpu_ticks_total );
-  } else if(p->cpu_ticks_total < 100) {
-    cprintf("0.0%d",p->cpu_ticks_total );
-  } else if(p->cpu_ticks_total < 1000) {
-    cprintf("0.%d",p->cpu_ticks_total );
-  } else{
-    cprintf("%d.%d",p->cpu_ticks_total/1000,p->cpu_ticks_total%1000);
+  if (p->cpu_ticks_total < 10)
+  {
+    cprintf("0.00%d", p->cpu_ticks_total);
+  }
+  else if (p->cpu_ticks_total < 100)
+  {
+    cprintf("0.0%d", p->cpu_ticks_total);
+  }
+  else if (p->cpu_ticks_total < 1000)
+  {
+    cprintf("0.%d", p->cpu_ticks_total);
+  }
+  else
+  {
+    cprintf("%d.%d", p->cpu_ticks_total / 1000, p->cpu_ticks_total % 1000);
   }
 
   cprintf("\t%s\t%d\t",
-    states[p->state],
-    p->sz
-  );
+          states[p->state],
+          p->sz);
 
   return;
 }
@@ -697,27 +721,33 @@ void procdump(void)
 }
 #ifdef CS333_P2
 // Helper function to access ptable for sys_getprocs
-int
-copy_proc(int max, struct uproc* up)
+int copy_proc(int max, struct uproc *up)
 {
   int tmp = 0;
-  struct proc* tp;
+  struct proc *tp;
   acquire(&ptable.lock);
 
-  for(tp = ptable.proc; tp < &ptable.proc[NPROC]; tp++){
+  for (tp = ptable.proc; tp < &ptable.proc[NPROC]; tp++)
+  {
     if (tmp == max)
       break;
-    if (tp->state == UNUSED || tp->state == EMBRYO){
+    if (tp->state == UNUSED || tp->state == EMBRYO)
+    {
       continue;
-    }else if(tp->state == SLEEPING || tp->state == RUNNABLE || tp->state == RUNNING || tp->state == ZOMBIE) {
+    }
+    else if (tp->state == SLEEPING || tp->state == RUNNABLE || tp->state == RUNNING || tp->state == ZOMBIE)
+    {
       up[tmp].pid = tp->pid;
       up[tmp].uid = tp->uid;
       up[tmp].gid = tp->gid;
 
       // Handle init PPID
-      if (tp->pid == 1){
+      if (tp->pid == 1)
+      {
         up[tmp].ppid = tp->pid;
-      }else{
+      }
+      else
+      {
         up[tmp].ppid = tp->parent->pid;
       }
 
@@ -725,8 +755,8 @@ copy_proc(int max, struct uproc* up)
       up[tmp].CPU_total_ticks = tp->cpu_ticks_total;
       safestrcpy(up[tmp].state, states[tp->state], sizeof(up[tmp].state));
       up[tmp].size = tp->sz;
-      safestrcpy(up[tmp].name, (char*)tp->name, sizeof(tp->name));
-  
+      safestrcpy(up[tmp].name, (char *)tp->name, sizeof(tp->name));
+
       tmp++;
     }
   }
