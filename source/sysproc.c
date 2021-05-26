@@ -97,6 +97,7 @@ sys_halt(void)
   return 0;
 }
 #endif // PDX_XV6
+#ifdef CS333_P1
 int
 sys_date(void)
 {
@@ -111,3 +112,52 @@ sys_date(void)
 
   return 0;
 }
+#endif
+#ifdef CS333_P2
+int
+sys_getuid(void)
+{
+  return myproc()->uid; 
+}
+int
+sys_getgid(void)
+{
+  return myproc()->gid;
+}
+int
+sys_getppid(void)
+{
+  if(myproc()->pid == 1)
+  {
+    return myproc()->pid;
+  }
+  return myproc()->parent->pid;
+}
+int
+sys_setuid(void)
+{
+  int tmp;
+
+  if(argint(0,&tmp) < 0 || tmp < 0 || tmp > 32767)
+  {
+    return -1;
+  }
+
+  myproc()->uid = (uint)tmp;
+  return 0;
+}
+int
+sys_setgid(void)
+{
+  int tmp;
+
+  if(argint(0,&tmp) < 0 || tmp < 0 || tmp > 32767)
+  {
+    return -1;
+  }
+
+  myproc()->gid = (uint)tmp;
+  return 0;
+}
+#endif
+

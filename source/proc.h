@@ -48,8 +48,12 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
-  char name[16];
-  uint start_ticks;               // Process name (debugging)
+  char name[16];               // Process name (debugging)
+  uint start_ticks;
+  uint uid;
+  uint gid;
+  uint cpu_ticks_total;        // total elapsed ticks in CPU
+  uint cpu_ticks_in;           // ticks when scheduled
 };
 
 // Process memory is laid out contiguously, low addresses first:

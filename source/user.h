@@ -46,3 +46,10 @@ int strncmp(const char*, const char*, uint);
 #ifdef CS333_P1
 int date(struct rtcdate*);
 #endif // CS333_P1
+#ifdef CS333_P2
+uint getuid(void);
+uint getgid(void);
+uint getppid(void);
+int setuid(uint);
+int setgid(uint);
+#endif // CS333_P2

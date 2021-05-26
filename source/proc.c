@@ -6,27 +6,31 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#ifdef CS333_P2
+#include "pdx.h"
+#endif
 
 static char *states[] = {
-  [UNUSED]    "unused",
-  [EMBRYO]    "embryo",
-  [SLEEPING]  "sleep ",
-  [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
-};
+    [UNUSED] "unused",
+    [EMBRYO] "embryo",
+    [SLEEPING] "sleep ",
+    [RUNNABLE] "runble",
+    [RUNNING] "run   ",
+    [ZOMBIE] "zombie"};
 
 #ifdef CS333_P3
 // record with head and tail pointer for constant-time access to the beginning
 // and end of a linked list of struct procs.  use with stateListAdd() and
 // stateListRemove().
-struct ptrs {
-  struct proc* head;
-  struct proc* tail;
+struct ptrs
+{
+  struct proc *head;
+  struct proc *tail;
 };
 #endif
 
-static struct {
+static struct
+{
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
@@ -35,9 +39,9 @@ static struct {
 #ifdef CS333_P3
 static void initProcessLists(void);
 static void initFreeList(void);
-static void stateListAdd(struct ptrs*, struct proc*);
-static int  stateListRemove(struct ptrs*, struct proc* p);
-static void assertState(struct proc*, enum procstate, const char *, int);
+static void stateListAdd(struct ptrs *, struct proc *);
+static int stateListRemove(struct ptrs *, struct proc *p);
+static void assertState(struct proc *, enum procstate, const char *, int);
 #ifdef DEBUG
 static void checkProcs(const char *, const char *, int);
 #endif
@@ -45,44 +49,45 @@ static void checkProcs(const char *, const char *, int);
 #ifdef CS333_P4
 static void printReadyLists();
 static void printReadyList(struct proc *, int);
-const int PER_LINE = 15;  // per line max on print
-const int PER_LINE_Z = (PER_LINE/2);  // zombie list has more chars per entry on print
-#endif // CS333_P4
+const int PER_LINE = 15;               // per line max on print
+const int PER_LINE_Z = (PER_LINE / 2); // zombie list has more chars per entry on print
+#endif                                 // CS333_P4
 
 static struct proc *initproc;
 
 uint nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
-static void wakeup1(void* chan);
+static void wakeup1(void *chan);
 
-void
-pinit(void)
+void pinit(void)
 {
   initlock(&ptable.lock, "ptable");
 }
 
 // Must be called with interrupts disabled
-int
-cpuid() {
-  return mycpu()-cpus;
+int cpuid()
+{
+  return mycpu() - cpus;
 }
 
 // Must be called with interrupts disabled to avoid the caller being
 // rescheduled between reading lapicid and running through the loop.
-struct cpu*
+struct cpu *
 mycpu(void)
 {
   int apicid, i;
 
-  if(readeflags()&FL_IF)
+  if (readeflags() & FL_IF)
     panic("mycpu called with interrupts enabled\n");
 
   apicid = lapicid();
   // APIC IDs are not guaranteed to be contiguous. Maybe we should have
   // a reverse map, or reserve a register to store &cpus[i].
-  for (i = 0; i < ncpu; ++i) {
-    if (cpus[i].apicid == apicid) {
+  for (i = 0; i < ncpu; ++i)
+  {
+    if (cpus[i].apicid == apicid)
+    {
       return &cpus[i];
     }
   }
@@ -91,8 +96,9 @@ mycpu(void)
 
 // Disable interrupts so that we are not rescheduled
 // while reading proc from the cpu structure
-struct proc*
-myproc(void) {
+struct proc *
+myproc(void)
+{
   struct cpu *c;
   struct proc *p;
   pushcli();
@@ -107,7 +113,7 @@ myproc(void) {
 // If found, change state to EMBRYO and initialize
 // state required to run in the kernel.
 // Otherwise return 0.
-static struct proc*
+static struct proc *
 allocproc(void)
 {
   struct proc *p;
@@ -115,12 +121,14 @@ allocproc(void)
 
   acquire(&ptable.lock);
   int found = 0;
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == UNUSED) {
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->state == UNUSED)
+    {
       found = 1;
       break;
     }
-  if (!found) {
+  if (!found)
+  {
     release(&ptable.lock);
     return 0;
   }
@@ -129,7 +137,8 @@ allocproc(void)
   release(&ptable.lock);
 
   // Allocate kernel stack.
-  if((p->kstack = kalloc()) == 0){
+  if ((p->kstack = kalloc()) == 0)
+  {
     p->state = UNUSED;
     return 0;
   }
@@ -137,27 +146,29 @@ allocproc(void)
 
   // Leave room for trap frame.
   sp -= sizeof *p->tf;
-  p->tf = (struct trapframe*)sp;
+  p->tf = (struct trapframe *)sp;
 
   // Set up new context to start executing at forkret,
   // which returns to trapret.
   sp -= 4;
-  *(uint*)sp = (uint)trapret;
+  *(uint *)sp = (uint)trapret;
 
   sp -= sizeof *p->context;
-  p->context = (struct context*)sp;
+  p->context = (struct context *)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
   p->start_ticks = ticks;
+
+  p->cpu_ticks_in = 0;
+  p->cpu_ticks_total = 0;
 
   return p;
 }
 
 //PAGEBREAK: 32
 // Set up first user process.
-void
-userinit(void)
+void userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
@@ -165,7 +176,7 @@ userinit(void)
   p = allocproc();
 
   initproc = p;
-  if((p->pgdir = setupkvm()) == 0)
+  if ((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
@@ -176,7 +187,12 @@ userinit(void)
   p->tf->ss = p->tf->ds;
   p->tf->eflags = FL_IF;
   p->tf->esp = PGSIZE;
-  p->tf->eip = 0;  // beginning of initcode.S
+  p->tf->eip = 0; // beginning of initcode.S
+
+#ifdef CS333_P2
+  p->uid = DEFAULT_UID;
+  p->gid = DEFAULT_GID;
+#endif
 
   safestrcpy(p->name, "initcode", sizeof(p->name));
   p->cwd = namei("/");
@@ -192,18 +208,20 @@ userinit(void)
 
 // Grow current process's memory by n bytes.
 // Return 0 on success, -1 on failure.
-int
-growproc(int n)
+int growproc(int n)
 {
   uint sz;
   struct proc *curproc = myproc();
 
   sz = curproc->sz;
-  if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
+  if (n > 0)
+  {
+    if ((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
-  } else if(n < 0){
-    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
+  }
+  else if (n < 0)
+  {
+    if ((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
       return -1;
   }
   curproc->sz = sz;
@@ -214,8 +232,7 @@ growproc(int n)
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
-int
-fork(void)
+int fork(void)
 {
   int i;
   uint pid;
@@ -223,12 +240,14 @@ fork(void)
   struct proc *curproc = myproc();
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if ((np = allocproc()) == 0)
+  {
     return -1;
   }
 
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+  if ((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0)
+  {
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
@@ -241,14 +260,16 @@ fork(void)
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
-  for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
+  for (i = 0; i < NOFILE; i++)
+    if (curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
+  np->uid = curproc->uid;
+  np->gid = curproc->gid;
 
   acquire(&ptable.lock);
   np->state = RUNNABLE;
@@ -260,19 +281,20 @@ fork(void)
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
-void
-exit(void)
+void exit(void)
 {
   struct proc *curproc = myproc();
   struct proc *p;
   int fd;
 
-  if(curproc == initproc)
+  if (curproc == initproc)
     panic("init exiting");
 
   // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
+  for (fd = 0; fd < NOFILE; fd++)
+  {
+    if (curproc->ofile[fd])
+    {
       fileclose(curproc->ofile[fd]);
       curproc->ofile[fd] = 0;
     }
@@ -289,10 +311,12 @@ exit(void)
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->parent == curproc)
+    {
       p->parent = initproc;
-      if(p->state == ZOMBIE)
+      if (p->state == ZOMBIE)
         wakeup1(initproc);
     }
   }
@@ -308,8 +332,7 @@ exit(void)
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-int
-wait(void)
+int wait(void)
 {
   struct proc *p;
   int havekids;
@@ -317,14 +340,17 @@ wait(void)
   struct proc *curproc = myproc();
 
   acquire(&ptable.lock);
-  for(;;){
+  for (;;)
+  {
     // Scan through table looking for exited children.
     havekids = 0;
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if (p->parent != curproc)
         continue;
       havekids = 1;
-      if(p->state == ZOMBIE){
+      if (p->state == ZOMBIE)
+      {
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -341,13 +367,14 @@ wait(void)
     }
 
     // No point waiting if we don't have any children.
-    if(!havekids || curproc->killed){
+    if (!havekids || curproc->killed)
+    {
       release(&ptable.lock);
       return -1;
     }
 
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
-    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+    sleep(curproc, &ptable.lock); //DOC: wait-sleep
   }
 }
 
@@ -359,41 +386,42 @@ wait(void)
 //  - swtch to start running that process
 //  - eventually that process transfers control
 //      via swtch back to the scheduler.
-void
-scheduler(void)
+void scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
 #ifdef PDX_XV6
-  int idle;  // for checking if processor is idle
-#endif // PDX_XV6
+  int idle; // for checking if processor is idle
+#endif      // PDX_XV6
 
-  for(;;){
+  for (;;)
+  {
     // Enable interrupts on this processor.
     sti();
 
 #ifdef PDX_XV6
-    idle = 1;  // assume idle unless we schedule a process
-#endif // PDX_XV6
+    idle = 1; // assume idle unless we schedule a process
+#endif        // PDX_XV6
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if (p->state != RUNNABLE)
         continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
 #ifdef PDX_XV6
-      idle = 0;  // not idle this timeslice
-#endif // PDX_XV6
+      idle = 0; // not idle this timeslice
+#endif          // PDX_XV6
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
       swtch(&(c->scheduler), p->context);
+      p->cpu_ticks_in = ticks;
       switchkvm();
-
       // Process is done running for now.
       // It should have changed its p->state before coming back.
       c->proc = 0;
@@ -401,7 +429,8 @@ scheduler(void)
     release(&ptable.lock);
 #ifdef PDX_XV6
     // if idle, wait for next interrupt
-    if (idle) {
+    if (idle)
+    {
       sti();
       hlt();
     }
@@ -416,32 +445,31 @@ scheduler(void)
 // be proc->intena and proc->ncli, but that would
 // break in the few places where a lock is held but
 // there's no process.
-void
-sched(void)
+void sched(void)
 {
   int intena;
   struct proc *p = myproc();
 
-  if(!holding(&ptable.lock))
+  if (!holding(&ptable.lock))
     panic("sched ptable.lock");
-  if(mycpu()->ncli != 1)
+  if (mycpu()->ncli != 1)
     panic("sched locks");
-  if(p->state == RUNNING)
+  if (p->state == RUNNING)
     panic("sched running");
-  if(readeflags()&FL_IF)
+  if (readeflags() & FL_IF)
     panic("sched interruptible");
   intena = mycpu()->intena;
   swtch(&p->context, mycpu()->scheduler);
+  p->cpu_ticks_total += ticks - (p->cpu_ticks_in);
   mycpu()->intena = intena;
 }
 
 // Give up the CPU for one scheduling round.
-void
-yield(void)
+void yield(void)
 {
   struct proc *curproc = myproc();
 
-  acquire(&ptable.lock);  //DOC: yieldlock
+  acquire(&ptable.lock); //DOC: yieldlock
   curproc->state = RUNNABLE;
   sched();
   release(&ptable.lock);
@@ -449,14 +477,14 @@ yield(void)
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
-void
-forkret(void)
+void forkret(void)
 {
   static int first = 1;
   // Still holding ptable.lock from scheduler.
   release(&ptable.lock);
 
-  if (first) {
+  if (first)
+  {
     // Some initialization functions must be run in the context
     // of a regular process (e.g., they call sleep), and thus cannot
     // be run from main().
@@ -470,12 +498,11 @@ forkret(void)
 
 // Atomically release lock and sleep on chan.
 // Reacquires lock when awakened.
-void
-sleep(void *chan, struct spinlock *lk)
+void sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
 
-  if(p == 0)
+  if (p == 0)
     panic("sleep");
 
   // Must acquire ptable.lock in order to
@@ -484,9 +511,11 @@ sleep(void *chan, struct spinlock *lk)
   // guaranteed that we won't miss any wakeup
   // (wakeup runs with ptable.lock locked),
   // so it's okay to release lk.
-  if(lk != &ptable.lock){  //DOC: sleeplock0
-    acquire(&ptable.lock);  //DOC: sleeplock1
-    if (lk) release(lk);
+  if (lk != &ptable.lock)
+  {                        //DOC: sleeplock0
+    acquire(&ptable.lock); //DOC: sleeplock1
+    if (lk)
+      release(lk);
   }
   // Go to sleep.
   p->chan = chan;
@@ -498,9 +527,11 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = 0;
 
   // Reacquire original lock.
-  if(lk != &ptable.lock){  //DOC: sleeplock2
+  if (lk != &ptable.lock)
+  { //DOC: sleeplock2
     release(&ptable.lock);
-    if (lk) acquire(lk);
+    if (lk)
+      acquire(lk);
   }
 }
 
@@ -512,14 +543,13 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    if (p->state == SLEEPING && p->chan == chan)
       p->state = RUNNABLE;
 }
 
 // Wake up all processes sleeping on chan.
-void
-wakeup(void *chan)
+void wakeup(void *chan)
 {
   acquire(&ptable.lock);
   wakeup1(chan);
@@ -529,17 +559,18 @@ wakeup(void *chan)
 // Kill the process with the given pid.
 // Process won't exit until it returns
 // to user space (see trap in trap.c).
-int
-kill(int pid)
+int kill(int pid)
 {
   struct proc *p;
 
   acquire(&ptable.lock);
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->pid == pid){
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->pid == pid)
+    {
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if (p->state == SLEEPING)
         p->state = RUNNABLE;
       release(&ptable.lock);
       return 0;
@@ -555,15 +586,129 @@ kill(int pid)
 // No lock to avoid wedging a stuck machine further.
 
 #if defined(CS333_P2)
-void
-procdumpP2P3P4(struct proc *p, char *state_string)
+void procdumpP2P3P4(struct proc *p, char *state_string)
 {
-  cprintf("TODO for Project 2, delete this line and implement procdumpP2P3P4() in proc.c to print a row\n");
+  int ticks_out = ticks - (p->start_ticks);
+
+  int left_ticks = ticks_out / 1000;
+  int right_ticks = ticks_out % 1000;
+
+  int cpu_out = p->cpu_ticks_total;
+
+  int cpu_left = p->cpu_ticks_total / 1000;
+  int cpu_right = p->cpu_ticks_total % 1000;
+
+  if (p->pid == 1)
+  {
+    if (ticks_out < 1000)
+    {
+      if (cpu_out > 1000)
+      {
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+      }
+      if (cpu_out < 1000)
+      {
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_out, states[p->state], p->sz);
+        }
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_out, states[p->state], p->sz);
+        }
+      }
+    }
+    if (ticks_out > 1000)
+    {
+      if (cpu_out < 1000)
+      {
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
+        }
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
+        }
+      }
+      if (cpu_out > 1000)
+      {
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+      }
+    }
+  }
+  if (p->pid != 1)
+  {
+    if (ticks_out < 1000)
+    {
+      if (cpu_out > 1000)
+      {
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+      }
+      if (cpu_out < 1000)
+      {
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_out, states[p->state], p->sz);
+        }
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_out, states[p->state], p->sz);
+        }
+      }
+    }
+    if (ticks_out > 1000)
+    {
+      if (cpu_out < 1000)
+      {
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
+        }
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
+        }
+      }
+      if (cpu_out > 1000)
+      {
+        if (cpu_out >= 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+        if (cpu_out < 10)
+        {
+          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
+        }
+      }
+    }
+  }
   return;
 }
-#elif defined(CS333_P1)
-void
-procdumpP1(struct proc *p, char *state_string)
+#endif
+#if defined(CS333_P1)
+void procdumpP1(struct proc *p, char *state_string)
 {
   int ticks_out = ticks - (p->start_ticks);
   if (ticks_out < 1000)
@@ -580,8 +725,7 @@ procdumpP1(struct proc *p, char *state_string)
 }
 #endif
 
-void
-procdump(void)
+void procdump(void)
 {
   int i;
   struct proc *p;
@@ -598,18 +742,19 @@ procdump(void)
 #define HEADER "\n"
 #endif
 
-  cprintf(HEADER);  // not conditionally compiled as must work in all project states
+  cprintf(HEADER); // not conditionally compiled as must work in all project states
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->state == UNUSED)
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
+    if (p->state == UNUSED)
       continue;
-    if(p->state >= 0 && p->state < NELEM(states) && states[p->state])
+    if (p->state >= 0 && p->state < NELEM(states) && states[p->state])
       state = states[p->state];
     else
       state = "???";
 
-    // see TODOs above this function
-    // P2 and P3 are identical and the P4 change is minor
+      // see TODOs above this function
+      // P2 and P3 are identical and the P4 change is minor
 #if defined(CS333_P2)
     procdumpP2P3P4(p, state);
 #elif defined(CS333_P1)
@@ -618,28 +763,32 @@ procdump(void)
     cprintf("%d\t%s\t%s\t", p->pid, p->name, state);
 #endif
 
-    if(p->state == SLEEPING){
-      getcallerpcs((uint*)p->context->ebp+2, pc);
-      for(i=0; i<10 && pc[i] != 0; i++)
+    if (p->state == SLEEPING)
+    {
+      getcallerpcs((uint *)p->context->ebp + 2, pc);
+      for (i = 0; i < 10 && pc[i] != 0; i++)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
   }
 #ifdef CS333_P1
-  cprintf("$ ");  // simulate shell prompt
-#endif // CS333_P1
+  cprintf("$ "); // simulate shell prompt
+#endif           // CS333_P1
 }
 
 #if defined(CS333_P3)
 // list management helper functions
 static void
-stateListAdd(struct ptrs* list, struct proc* p)
+stateListAdd(struct ptrs *list, struct proc *p)
 {
-  if((*list).head == NULL){
+  if ((*list).head == NULL)
+  {
     (*list).head = p;
     (*list).tail = p;
     p->next = NULL;
-  } else{
+  }
+  else
+  {
     ((*list).tail)->next = p;
     (*list).tail = ((*list).tail)->next;
     ((*list).tail)->next = NULL;
@@ -649,27 +798,32 @@ stateListAdd(struct ptrs* list, struct proc* p)
 
 #if defined(CS333_P3)
 static int
-stateListRemove(struct ptrs* list, struct proc* p)
+stateListRemove(struct ptrs *list, struct proc *p)
 {
-  if((*list).head == NULL || (*list).tail == NULL || p == NULL){
+  if ((*list).head == NULL || (*list).tail == NULL || p == NULL)
+  {
     return -1;
   }
 
-  struct proc* current = (*list).head;
-  struct proc* previous = 0;
+  struct proc *current = (*list).head;
+  struct proc *previous = 0;
 
-  if(current == p){
+  if (current == p)
+  {
     (*list).head = ((*list).head)->next;
     // prevent tail remaining assigned when we've removed the only item
     // on the list
-    if((*list).tail == p){
+    if ((*list).tail == p)
+    {
       (*list).tail = NULL;
     }
     return 0;
   }
 
-  while(current){
-    if(current == p){
+  while (current)
+  {
+    if (current == p)
+    {
       break;
     }
 
@@ -678,15 +832,19 @@ stateListRemove(struct ptrs* list, struct proc* p)
   }
 
   // Process not found. return error
-  if(current == NULL){
+  if (current == NULL)
+  {
     return -1;
   }
 
   // Process found.
-  if(current == (*list).tail){
+  if (current == (*list).tail)
+  {
     (*list).tail = previous;
     ((*list).tail)->next = NULL;
-  } else{
+  }
+  else
+  {
     previous->next = current->next;
   }
 
@@ -703,12 +861,14 @@ initProcessLists()
 {
   int i;
 
-  for (i = UNUSED; i <= ZOMBIE; i++) {
+  for (i = UNUSED; i <= ZOMBIE; i++)
+  {
     ptable.list[i].head = NULL;
     ptable.list[i].tail = NULL;
   }
 #if defined(CS333_P4)
-  for (i = 0; i <= MAXPRIO; i++) {
+  for (i = 0; i <= MAXPRIO; i++)
+  {
     ptable.ready[i].head = NULL;
     ptable.ready[i].tail = NULL;
   }
@@ -720,9 +880,10 @@ initProcessLists()
 static void
 initFreeList(void)
 {
-  struct proc* p;
+  struct proc *p;
 
-  for(p = ptable.proc; p < ptable.proc + NPROC; ++p){
+  for (p = ptable.proc; p < ptable.proc + NPROC; ++p)
+  {
     p->state = UNUSED;
     stateListAdd(&ptable.list[UNUSED], p);
   }
@@ -735,34 +896,32 @@ initFreeList(void)
 // This code uses gcc preprocessor directives. For details, see
 // https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
 static void
-assertState(struct proc *p, enum procstate state, const char * func, int line)
+assertState(struct proc *p, enum procstate state, const char *func, int line)
 {
-    if (p->state == state)
-      return;
-    cprintf("Error: proc state is %s and should be %s.\nCalled from %s line %d\n",
-        states[p->state], states[state], func, line);
-    panic("Error: Process state incorrect in assertState()");
+  if (p->state == state)
+    return;
+  cprintf("Error: proc state is %s and should be %s.\nCalled from %s line %d\n",
+          states[p->state], states[state], func, line);
+  panic("Error: Process state incorrect in assertState()");
 }
 #endif
 
 #if defined(CS333_P3)
 // Project 3/4 control sequence support
-void
-printList(int state)
+void printList(int state)
 {
   int count = 0;
   struct proc *p;
-  static char *stateNames[] = {  // note: sparse array
-    [RUNNABLE]  "Runnable",
-    [SLEEPING]  "Sleep",
-    [RUNNING]   "Running",
-    [ZOMBIE]    "Zombie"
-  };
+  static char *stateNames[] = {// note: sparse array
+                               [RUNNABLE] "Runnable",
+                               [SLEEPING] "Sleep",
+                               [RUNNING] "Running",
+                               [ZOMBIE] "Zombie"};
 
-
-  if (state < UNUSED || state > ZOMBIE) {
+  if (state < UNUSED || state > ZOMBIE)
+  {
     cprintf("Invalid control sequence\n");
-    cprintf("$ ");  // simulate shell prompt
+    cprintf("$ "); // simulate shell prompt
     return;
   }
 
@@ -771,100 +930,109 @@ printList(int state)
   checkProcs(__FILE__, __FUNCTION__, __LINE__);
 #endif
 #ifdef CS333_P4
-  if (state == RUNNABLE) {
+  if (state == RUNNABLE)
+  {
     printReadyLists();
     release(&ptable.lock);
-    cprintf("$ ");  // simulate shell prompt
+    cprintf("$ "); // simulate shell prompt
     return;
   }
 #endif
   cprintf("\n%s List Processes:\n", stateNames[state]);
   p = ptable.list[state].head;
-  while (p != NULL) {
-    if (p->state != state) {  // sanity check
+  while (p != NULL)
+  {
+    if (p->state != state)
+    { // sanity check
       cprintf("Error: PID %d on %s list but should be on %s\n",
-          p->pid, states[p->state], states[state]);
+              p->pid, states[p->state], states[state]);
       panic("Corrupted list\n");
     }
     if (state == ZOMBIE)
       cprintf("(%d, %d)", p->pid,
-          (p->parent) ? p->parent->pid : p->pid);
+              (p->parent) ? p->parent->pid : p->pid);
     else
       cprintf("%d", p->pid);
     p = p->next;
     cprintf("%s", p ? " -> " : "\n");
     if (p && (++count) %
-        ((state == ZOMBIE) ? PER_LINE_Z : PER_LINE) == 0)
+                     ((state == ZOMBIE) ? PER_LINE_Z : PER_LINE) ==
+                 0)
       cprintf("\n");
   }
   release(&ptable.lock);
-  cprintf("$ ");  // simulate shell prompt
+  cprintf("$ "); // simulate shell prompt
   return;
 }
 
-void
-printFreeList(void)
+void printFreeList(void)
 {
   int count = 0;
   struct proc *p;
 
   acquire(&ptable.lock);
   p = ptable.list[UNUSED].head;
-  while (p != NULL) {
+  while (p != NULL)
+  {
     count++;
     p = p->next;
   }
   release(&ptable.lock);
   cprintf("\nFree List Size: %d processes\n", count);
-  cprintf("$ ");  // simulate shell prompt
+  cprintf("$ "); // simulate shell prompt
   return;
 }
 
-void
-printListStats()
+void printListStats()
 {
   int i, count, total = 0;
   struct proc *p;
 
   acquire(&ptable.lock);
-  for (i=UNUSED; i<=ZOMBIE; i++) {
+  for (i = UNUSED; i <= ZOMBIE; i++)
+  {
     count = 0;
     p = ptable.list[i].head;
-    while (p != NULL) {
+    while (p != NULL)
+    {
       count++;
-      if(p->state != i) {
+      if (p->state != i)
+      {
         cprintf("\nlist invariant failed: process %d has state %s but is on list %s\n",
-            p->pid, states[p->state], states[i]);
+                p->pid, states[p->state], states[i]);
       }
       p = p->next;
     }
     cprintf("\n%s list has ", states[i]);
-    if (count < 10) cprintf(" ");  // line up columns. we know NPROC < 100
+    if (count < 10)
+      cprintf(" "); // line up columns. we know NPROC < 100
     cprintf("%d processes", count);
     total += count;
   }
   release(&ptable.lock);
   cprintf("\nTotal on lists is: %d. NPROC = %d. %s",
-      total, NPROC, (total == NPROC) ? "Congratulations!" : "Bummer");
-  cprintf("\n$ ");  // simulate shell prompt
+          total, NPROC, (total == NPROC) ? "Congratulations!" : "Bummer");
+  cprintf("\n$ "); // simulate shell prompt
   return;
 }
 #endif // CS333_P3
 
 #ifdef CS333_P4
-void
-printReadyList(struct proc *p, int prio)
+void printReadyList(struct proc *p, int prio)
 {
-  if (p == NULL) {
+  if (p == NULL)
+  {
     cprintf("(NULL)\n");
     return;
   }
   int count = 0;
-  do {
+  do
+  {
     cprintf("%d", p->pid);
-    if(p->priority != prio) {
+    if (p->priority != prio)
+    {
       cprintf("\nlist invariant failed: process %d has prio %d but is on runnable list %d\n",
-          p->pid, p->priority, prio);
+              p->pid, p->priority, prio);
     }
     p = p->next;
     cprintf("%s", p ? " -> " : "\n");
@@ -873,18 +1041,19 @@ printReadyList(struct proc *p, int prio)
   } while (p != NULL);
 }
 
-void
-printReadyLists()
+void printReadyLists()
 {
   struct proc *p;
 
   cprintf("Ready List Processes:\n");
-  for (int i=0; i<=MAXPRIO; i++) {
+  for (int i = 0; i <= MAXPRIO; i++)
+  {
     p = ptable.ready[i].head;
     cprintf("Prio %d: ", i);
-    if(p->state != RUNNABLE) {
+    if (p->state != RUNNABLE)
+    {
       cprintf("\nlist invariant failed: process %d has state %s but is on ready list\n",
-          p->pid, states[p->state]);
+              p->pid, states[p->state]);
     }
     printReadyList(p, i);
   }
@@ -896,7 +1065,8 @@ printReadyLists()
 static int
 procLookup(struct proc *p, struct proc *np)
 {
-  while (np != NULL) {
+  while (np != NULL)
+  {
     if (np == p)
       return 1;
     np = np->next;
@@ -907,8 +1077,9 @@ procLookup(struct proc *p, struct proc *np)
 static int
 findProc(struct proc *p)
 {
-  for (int i=UNUSED; i<=ZOMBIE; i++)
-    if (procLookup(p, ptable.list[i].head)   != 0) return 1;
+  for (int i = UNUSED; i <= ZOMBIE; i++)
+    if (procLookup(p, ptable.list[i].head) != 0)
+      return 1;
   return 0; // not found
 }
 
@@ -918,9 +1089,11 @@ checkProcs(const char *file, const char *func, int line)
   int found;
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+  for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+  {
     found = findProc(p);
-    if (found) continue;
+    if (found)
+      continue;
     cprintf("checkprocs error. Called from %s, %s, @ %d\n", file, func, line);
     panic("Process array and lists inconsistent\n");
   }
