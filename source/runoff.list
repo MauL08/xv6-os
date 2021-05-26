@@ -93,3 +93,4 @@ p3-test.c
 p4-test.c
 testsetprio.c
 ps.c
+time.c

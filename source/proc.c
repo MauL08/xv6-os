@@ -589,122 +589,41 @@ int kill(int pid)
 #if defined(CS333_P2)
 void procdumpP2P3P4(struct proc *p, char *state_string)
 {
-  int ticks_out = ticks - (p->start_ticks);
+  cprintf("%d\t%s\t\t%d\t%d\t%d\t",
+    p->pid,
+    p->name,
+    p->uid,
+    p->gid,
+    p->pid == 1 ? p->pid : p->parent->pid
+  );
 
-  int left_ticks = ticks_out / 1000;
-  int right_ticks = ticks_out % 1000;
-
-  int cpu_out = p->cpu_ticks_total;
-
-  int cpu_left = p->cpu_ticks_total / 1000;
-  int cpu_right = p->cpu_ticks_total % 1000;
-
-  if (p->pid == 1)
-  {
-    if (ticks_out < 1000)
-    {
-      if (cpu_out > 1000)
-      {
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-      }
-      if (cpu_out < 1000)
-      {
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_out, states[p->state], p->sz);
-        }
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, ticks_out, cpu_out, states[p->state], p->sz);
-        }
-      }
-    }
-    if (ticks_out > 1000)
-    {
-      if (cpu_out < 1000)
-      {
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
-        }
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
-        }
-      }
-      if (cpu_out > 1000)
-      {
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-      }
-    }
+  // Elapsed
+  if ((ticks - (p->start_ticks)) < 10){
+    cprintf("0.00%d\t",(ticks - (p->start_ticks)) );
+  } else if((ticks - (p->start_ticks)) < 100) {
+    cprintf("0.0%d\t",(ticks - (p->start_ticks)) );
+  } else if((ticks - (p->start_ticks)) < 1000) {
+    cprintf("0.%d\t",(ticks - (p->start_ticks)) );
+  } else{
+    cprintf("%d.%d\t",(ticks - (p->start_ticks))/1000,(ticks - (p->start_ticks))%1000);
   }
-  if (p->pid != 1)
-  {
-    if (ticks_out < 1000)
-    {
-      if (cpu_out > 1000)
-      {
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-      }
-      if (cpu_out < 1000)
-      {
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_out, states[p->state], p->sz);
-        }
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t0.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, ticks_out, cpu_out, states[p->state], p->sz);
-        }
-      }
-    }
-    if (ticks_out > 1000)
-    {
-      if (cpu_out < 1000)
-      {
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
-        }
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t0.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_out, states[p->state], p->sz);
-        }
-      }
-      if (cpu_out > 1000)
-      {
-        if (cpu_out >= 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.0%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-        if (cpu_out < 10)
-        {
-          cprintf("%d\t%s\t\t%d\t%d\t%d\t%d.%d\t%d.00%d\t%s\t%d\t", p->pid, p->name, p->uid, p->gid, p->parent->pid, left_ticks, right_ticks, cpu_left, cpu_right, states[p->state], p->sz);
-        }
-      }
-    }
+
+  // CPU ticks
+  if (p->cpu_ticks_total < 10){
+    cprintf("0.00%d", p->cpu_ticks_total );
+  } else if(p->cpu_ticks_total < 100) {
+    cprintf("0.0%d",p->cpu_ticks_total );
+  } else if(p->cpu_ticks_total < 1000) {
+    cprintf("0.%d",p->cpu_ticks_total );
+  } else{
+    cprintf("%d.%d",p->cpu_ticks_total/1000,p->cpu_ticks_total%1000);
   }
+
+  cprintf("\t%s\t%d\t",
+    states[p->state],
+    p->sz
+  );
+
   return;
 }
 #endif
