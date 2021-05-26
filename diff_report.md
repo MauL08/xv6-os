@@ -696,6 +696,7 @@ index 0d4eaed..7c0ca74 100644
 +SYSCALL(getprocs)
 ```
 ```diff
+diff --git a/ps.c b/ps.c
 +#ifdef CS333_P2
 +
 +#define MAX_ENTRIES 16
@@ -762,8 +763,8 @@ index 0d4eaed..7c0ca74 100644
 +  printf(1, "\n");
 +  exit();
 +}
-
-#
++
++#
 ```
 # "time" Command
 ```diff
