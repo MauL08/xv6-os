@@ -1,4 +1,4 @@
-# Assignment 1 Operating System Class (xv6-pdx)
+# Assignment 2 Operating System Class (xv6-pdx)
 - Nama : Akbar Maulana Alfatih
 - NIM  : 1313619003
 - Ilmu Komputer 2019
