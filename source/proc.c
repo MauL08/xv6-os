@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "uproc.h"
 #ifdef CS333_P2
 #include "pdx.h"
 #endif
@@ -775,6 +776,46 @@ void procdump(void)
   cprintf("$ "); // simulate shell prompt
 #endif           // CS333_P1
 }
+#ifdef CS333_P2
+// Helper function to access ptable for sys_getprocs
+int
+copy_proc(int max, struct uproc* up)
+{
+  int tmp = 0;
+  struct proc* tp;
+  acquire(&ptable.lock);
+
+  for(tp = ptable.proc; tp < &ptable.proc[NPROC]; tp++){
+    if (tmp == max)
+      break;
+    if (tp->state == UNUSED || tp->state == EMBRYO){
+      continue;
+    }else if(tp->state == SLEEPING || tp->state == RUNNABLE || tp->state == RUNNING || tp->state == ZOMBIE) {
+      up[tmp].pid = tp->pid;
+      up[tmp].uid = tp->uid;
+      up[tmp].gid = tp->gid;
+
+      // Handle init PPID
+      if (tp->pid == 1){
+        up[tmp].ppid = tp->pid;
+      }else{
+        up[tmp].ppid = tp->parent->pid;
+      }
+
+      up[tmp].elapsed_ticks = ticks - tp->start_ticks;
+      up[tmp].CPU_total_ticks = tp->cpu_ticks_total;
+      safestrcpy(up[tmp].state, states[tp->state], sizeof(up[tmp].state));
+      up[tmp].size = tp->sz;
+      safestrcpy(up[tmp].name, (char*)tp->name, sizeof(tp->name));
+  
+      tmp++;
+    }
+  }
+
+  release(&ptable.lock);
+  return tmp;
+}
+#endif // CS333_P2
 
 #if defined(CS333_P3)
 // list management helper functions

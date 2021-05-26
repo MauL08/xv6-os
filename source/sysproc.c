@@ -6,6 +6,9 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#ifdef CS333_P2
+#include "uproc.h"
+#endif
 #ifdef PDX_XV6
 #include "pdx-kernel.h"
 #endif // PDX_XV6
@@ -160,4 +163,16 @@ sys_setgid(void)
   return 0;
 }
 #endif
+#ifdef CS333_P2
+int
+sys_getprocs(void)
+{
+  int max;
+  struct uproc* up;
 
+  if (argint(0, &max) < 0 || argptr(1, (void*)&up, sizeof(struct uproc) * max) < 0)
+    return -1;
+
+  return copy_proc(max, up);
+}
+#endif // CS333_P2

@@ -52,4 +52,5 @@ uint getgid(void);
 uint getppid(void);
 int setuid(uint);
 int setgid(uint);
+int getprocs(uint, struct uproc*);
 #endif // CS333_P2
